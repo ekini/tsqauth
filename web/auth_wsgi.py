@@ -199,8 +199,8 @@ def application(env, start_response):
     ip = env["REMOTE_ADDR"]
     username = d.get('username', [''])[0]
     password = d.get('password', [''])[0]
-    url = d.get('url', ['http://google.com'])[0]
-    signout = d.get('signout', [''])[0]
+    url      = d.get('url', ['http://google.com'])[0]
+    signout  = d.get('signout', [''])[0]
 
     # ескейпим данные, полученные от пользователя
     username = cgi.escape(username)
