@@ -1,0 +1,53 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>ERROR: The requested URL could not be retrieved</title>
+<style type="text/css"><!--
+ %l
+
+body
+:lang(fa) { direction: rtl; font-size: 100%; font-family: Tahoma, Roya, sans-serif; float: right; }
+:lang(he) { direction: rtl; float: right; }
+ --></style>
+</head><body>
+<div id="titles">
+<h1>ОАО ВНИПИэнергопром ЗСФ</h1>
+<h2>Запрошенный адрес не может быть показан, требуется авторизация</h2>
+</div>
+<hr>
+
+<div id="content">
+<p>The following error was encountered while trying to retrieve the URL: <a href="%u">%u</a></p>
+
+<form action="http://192.168.0.1/cgi-bin/auth.py" method="post">
+<table><tr><td>
+<table align="center" border="0">
+<tr><td>
+<input type="hidden" name="url" value="%u">
+Имя пользователя:</td><td><input type="text" name="username"></td>
+</tr>
+<tr><td>
+Пароль:</td><td><input type="password" name="password"></td>
+</tr>
+<tr><td>
+<input type=submit>
+</td></tr>
+</table>
+</td></tr></table>
+</form>
+<blockquote id="error">
+<p><b>Access Denied.</b></p>
+</blockquote>
+
+<p>Access control configuration prevents your request from being allowed at this time. Please contact your service provider if you feel this is incorrect.</p>
+
+<p>Your cache administrator is <a href="mailto:%w%W">%w</a>.</p>
+<br>
+</div>
+
+<hr>
+<div id="footer">
+<p>Generated %T by %h (%s)</p>
+<!-- %c -->
+</div>
+</body></html>
