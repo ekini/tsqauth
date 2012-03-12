@@ -1,0 +1,75 @@
+Ekini soft (c) \m/ :D
+
+Тут находятся скрипты для прозрачной аутентификации пользователей на squid.
+Используются nginx+uwsgi+python+python-sqlite+python-ldap.
+
+Суть:
+1) Пользователи прозрачно заворачиваются фаерволлом в squid.
+2) squid с помощью external_acl_type, которым служит скрипт на питоне
+проверяет наличие текущей сессии в бд. Сессия проверяется по ip, скрипт выдает
+имя пользователя, если такой пользователь с таким ip залогинен.
+3) Если сессии не существует, то сквид выдает кастомную страничку ошибки с формой
+аутентификации, отправляет её в cgi-скрипт. Скрипт проверяет наличие таких
+логина и пароля в бд (ldap или sqlite) и пишет в бд сессию (таблица
+addresses). Также пишет время логина и пользователя в таблицу log.
+3) Если пользователь залогинен и заходит на адрес скрипта в nginx, то выдаем
+ему информацию с его именем пользователя, ip-адресом, временем захода, а также
+временем конца сессии.
+
+Правило для iptables:
+iptables -t nat -I PREROUTING 1 -p tcp -s 192.168.0.0 ! -d 192.168.0.1 --dport
+80 -k REDIRECT --to-ports 3128
+
+Список директорий:
+1) squid - тут содержатся конфиги и скрипты для сквида.
+В примере конфига аутентифицируются только несколько ip адресов, т.к. им
+выдается больше прав в squidGuard (его конфиг здесь не приведен).
+
+2) util - тут лежит утилитка для работы с бд (sqlite) пользователей. Может
+добавлять, удалять пользователей.
+
+3) web - а тут скрипты и конфиги для nginx+uwsgi.
+
+Ниже - версии софта с USE-флагами.
+
+net-proxy/squid
+Installed versions:  3.1.8!t(02:07:19 PM 07/12/2011)(caps epoll ipv6
+kernel_linux ldap logrotate pam samba snmp ssl tproxy -ecap -elibc_uclibc
+-icap-client -ipf-transparent -kerberos -kqueue -mysql -nis -pf-transparent
+-postgres -radius -sasl -selinux -sqlite -test -zero-penalty-hit)
+
+www-servers/nginx
+Installed versions:  1.0.10(04:22:34 PM 02/28/2012)(http http-cache ipv6
+nginx_modules_http_access nginx_modules_http_auth_basic
+nginx_modules_http_autoindex nginx_modules_http_browser
+nginx_modules_http_charset nginx_modules_http_empty_gif
+nginx_modules_http_fastcgi nginx_modules_http_geo nginx_modules_http_gzip
+nginx_modules_http_limit_req nginx_modules_http_limit_zone
+nginx_modules_http_map nginx_modules_http_memcached nginx_modules_http_proxy
+nginx_modules_http_referer nginx_modules_http_rewrite nginx_modules_http_scgi
+nginx_modules_http_split_clients nginx_modules_http_ssi
+nginx_modules_http_upstream_ip_hash nginx_modules_http_userid
+nginx_modules_http_uwsgi pcre ssl -aio -debug -libatomic
+-nginx_modules_http_addition -nginx_modules_http_cache_purge
+-nginx_modules_http_dav -nginx_modules_http_degradation
+-nginx_modules_http_flv -nginx_modules_http_geoip
+-nginx_modules_http_gzip_static -nginx_modules_http_headers_more
+-nginx_modules_http_image_filter -nginx_modules_http_mp4
+-nginx_modules_http_passenger -nginx_modules_http_perl
+-nginx_modules_http_push -nginx_modules_http_random_index
+-nginx_modules_http_realip -nginx_modules_http_secure_link
+-nginx_modules_http_slowfs_cache -nginx_modules_http_stub_status
+-nginx_modules_http_sub -nginx_modules_http_upload
+-nginx_modules_http_upload_progress -nginx_modules_http_xslt
+-nginx_modules_mail_imap -nginx_modules_mail_pop3 -nginx_modules_mail_smtp
+-vim-syntax)
+
+www-servers/uwsgi
+Installed versions:  1.0.2.1(08:31:15 AM 02/29/2012)(-apache2)
+
+dev-python/pysqlite
+Installed versions:  2.6.3(2)(02:41:12 PM 07/12/2011)(examples)
+
+dev-python/python-ldap
+Installed versions:  2.3.13(03:14:25 PM 07/13/2011)(doc examples ssl -sasl)
+
