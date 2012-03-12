@@ -244,4 +244,3 @@ if __name__=="__main__":
     u = urllib.quote("http://google.com")
     print application({"QUERY_STRING" : "username=Dementiev&password=338857&url=%s" % u, "REMOTE_ADDR" : "192.168.0.108"}, my_response )
 
-
