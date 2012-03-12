@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import cgi
-#import cgitb; cgitb.enable() # for additional debugging
 from urlparse import parse_qs
 import urllib
 import ldap 
