@@ -25,7 +25,7 @@ UWSGI_CHILDREN=1
 
 # The log file path. If empty logging is disabled
 #
-UWSGI_LOG_FILE=/tmp/auth_w.log
+UWSGI_LOG_FILE=/var/log/auth_w.log
 
 # If you want to run your application inside a chroot then specify the
 # directory here. Leave this blank otherwise.
