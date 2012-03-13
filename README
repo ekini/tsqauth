@@ -67,6 +67,11 @@ nginx_modules_http_uwsgi pcre ssl -aio -debug -libatomic
 www-servers/uwsgi
 Installed versions:  1.0.2.1(08:31:15 AM 02/29/2012)(-apache2)
 
+dev-lang/python
+Installed versions:  2.7.2-r3(2.7)(08:02:00 AM 03/13/2012)(gdbm ipv6 ncurses readline sqlite ssl threads wide-unicode xml -berkdb -build -doc -elibc_uclibc -examples -tk -wininst) 
+
+Опционально:
+
 dev-python/pysqlite
 Installed versions:  2.6.3(2)(02:41:12 PM 07/12/2011)(examples)
 
