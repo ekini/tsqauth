@@ -1,15 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import pysqlite2
-from pysqlite2 import dbapi2 as sqlite3
+try:
+    import sqlite3
+except ImportError:
+    from pysqlite2 import dbapi2 as sqlite3
 
 import sys # sys.exit
-import getopt # getopt
+
+from argparse import ArgumentParser
+import ConfigParser
 import hashlib # md5 hash
 import base64
 
-path="/usr/libexec/squidldapauth/users.db"
+conffile = "/etc/squid-transparent-auth/config.cfg"
 
 def error(e):
     print "Error:", e
@@ -28,9 +32,9 @@ def passwd(p):
     return base64.b64encode(m.digest())
 
 # выводит список всех пользователей с хешами паролей
-def list():
+def list_users():
     global con, cur
-    cur.execute("select * from users")
+    cur.execute("select username,password from users")
     result = cur.fetchall()
     for x, y in result:
         print "User:", x, "md5:", y
@@ -40,7 +44,7 @@ def add(user,password):
     global con, cur
     password = passwd(password)
     if not get(user):
-        cur.execute("INSERT INTO users (`username`, `password`) VALUES (\"%s\", \"%s\")" % (user, password))
+        cur.execute("INSERT INTO users (`username`, `password`) VALUES (?, ?)", (user, password))
         con.commit()
         print "User %s added" % user
     else:
@@ -49,7 +53,7 @@ def add(user,password):
 # проверяет, существует ли пользователь в базе
 def get(user):
     global con, cur
-    cur.execute("SELECT * from users where username=\'%s\';" % user)
+    cur.execute("SELECT * from users where username=?", user)
     if cur.fetchone():
         return 1
 
@@ -57,7 +61,7 @@ def get(user):
 def delete(user):
     global con, cur
     if get(user):
-        cur.execute("DELETE from users where username=\'%s\';" % user)
+        cur.execute("DELETE from users where username=?", user)
         con.commit()
         print "User %s deleted" % user
     else:
@@ -66,8 +70,10 @@ def delete(user):
 def main():
     global con, cur
     try:
+        config = ConfigParser.ConfigParser()
+        config.readfp(open(conffile))
         # коннектимся к бд, создаем таблицу, если её не существует
-        con = sqlite3.connect(path)
+        con = sqlite3.connect(config.get("sql_auth", "users"))
         cur = con.cursor()
         cur.execute("""
         create table if not exists users
@@ -76,43 +82,18 @@ def main():
             password    varchar(32) NOT NULL
         )""")
         con.commit()
-        
-        user = ""
-        password = ""
-        # man 3 getopt
-        opts, args = getopt.getopt(sys.argv[1:], "adu:p:h")
-
-        if not opts: list()
-
-        for o, a in opts:
-            if o == "-h":
-                usage()
-            elif o == "-u":
-                user = a
-            elif o == "-p":
-                password = a
-            elif o == "-d":
-                if (user):
-                    delete(user)
-                else:
-                    error("Enter username")
-                break
-            elif o == "-a":
-                if (user and password):
-                    add(user, passwd(password))
-                else:
-                    error("Enter username and password")
- 
+       
+        list_users()
+    except IOError as e:
+        print "Cannot open config file:", e
+    except sqlite3.OperationalError as e:
+        print "Sql error:", e
+    except ImportError:
+        pass
+    finally:
         # закрываем бд
         cur.close()
         con.close()
-    except(pysqlite2.dbapi2.OperationalError) as e:
-        print "Sql error:", e
-    except getopt.GetoptError, err:
-        print str(err) 
-        usage()
-
-
 if __name__=="__main__":
     main()
 
