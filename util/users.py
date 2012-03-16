@@ -6,25 +6,22 @@ try:
 except ImportError:
     from pysqlite2 import dbapi2 as sqlite3
 
+import argparse
 import sys # sys.exit
+import locale
 
 from argparse import ArgumentParser
 import ConfigParser
 import hashlib # md5 hash
 import base64
 
-conffile = "/etc/squid-transparent-auth/config.cfg"
+conffile = "/etc/tsqauth/config.cfg"
+cur = None
+con = None
 
 def error(e):
     print "Error:", e
-def usage():
-    print sys.argv[0], "[-u username] [-p password] [-a] [-d]"
-    print """-a add user
--d delete user
--u username
--p password
-    """
-    sys.exit(2)
+
 # выдает md5 хэш строки
 def passwd(p):
     m = hashlib.md5()
@@ -43,57 +40,68 @@ def list_users():
 def add(user,password):
     global con, cur
     password = passwd(password)
-    if not get(user):
+    try:
         cur.execute("INSERT INTO users (`username`, `password`) VALUES (?, ?)", (user, password))
         con.commit()
-        print "User %s added" % user
-    else:
-        error("User exists")
-
-# проверяет, существует ли пользователь в базе
-def get(user):
-    global con, cur
-    cur.execute("SELECT * from users where username=?", user)
-    if cur.fetchone():
-        return 1
+    except sqlite3.IntegrityError as e:
+        error(e)
 
 # удаляет пользователя
 def delete(user):
     global con, cur
-    if get(user):
-        cur.execute("DELETE from users where username=?", user)
-        con.commit()
-        print "User %s deleted" % user
-    else:
-        error("User not found")
+    cur.execute("DELETE from users where username=?", (user,))
+    print cur.rowcount
+    con.commit()
 
 def main():
     global con, cur
     try:
+        
+        print "c: ", locale.getpreferredencoding()
         config = ConfigParser.ConfigParser()
         config.readfp(open(conffile))
         # коннектимся к бд, создаем таблицу, если её не существует
-        con = sqlite3.connect(config.get("sql_auth", "users"))
+        con = sqlite3.connect(config.get("sql_auth", "users"), 10) # timeout 10
         cur = con.cursor()
-        cur.execute("""
-        create table if not exists users
-        (
-            username    varchar(32) NOT NULL,
-            password    varchar(32) NOT NULL
-        )""")
-        con.commit()
-       
-        list_users()
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-p", "--password", action="store")
+        parser.add_argument("-u", "--user", action="store")
+        group = parser.add_mutually_exclusive_group()
+        group.add_argument("-a", "--add", action='store_true', help="Add user")
+        group.add_argument("-l", "--list", action='store_true', help="List users")
+        group.add_argument("-d", "--delete", action='store_true', help="Delete user")
+
+        args = parser.parse_args()
+
+        if args.add:
+            if (args.user is not None) and (args.password is not None):
+                add(args.user.decode(locale.getpreferredencoding()), args.password.decode(locale.getpreferredencoding()))
+            else:
+                error("need username and password")
+                sys.exit(2)
+        elif args.delete:
+            if (args.user is not None):
+                delete(args.user)
+            else:
+                error("need username")
+                sys.exit(2)
+        else:
+            list_users()
+   
+
     except IOError as e:
         print "Cannot open config file:", e
     except sqlite3.OperationalError as e:
-        print "Sql error:", e
+        error(e)
+
     except ImportError:
         pass
     finally:
         # закрываем бд
-        cur.close()
-        con.close()
+        if cur is not None: cur.close()
+        if cur is not None: con.close()
+
 if __name__=="__main__":
     main()
 
