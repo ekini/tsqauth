@@ -6,20 +6,24 @@ try:
 except ImportError:
     from pysqlite2 import dbapi2 as sqlite3
 
-import ConfigParser
-import argparse
+try:                                                                                     
+    import configparser # python3
+except ImportError:
+    import ConfigParser as configparser # python2
 
 conffile = "/etc/tsqauth/config.cfg"                                                     
 cur = None                                                                               
 con = None
 
-def cmd_twi_login(name):
-    pass
+def error(*e):
+    l = list(e)
+    l.insert(0, "Error:")
+    print(" ".join(l))
 
 def main():
     global con, cur
     try:
-        config = ConfigParser.ConfigParser()
+        config = configparser.ConfigParser()
         config.readfp(open(conffile))
         # коннектимся к бд, создаем таблицу, если её не существует
         con = sqlite3.connect(config.get("sql_auth", "users"))
@@ -33,9 +37,9 @@ def main():
         con.commit()
 
     except IOError as e:
-        print "Cannot open config file:", e
+        error("Cannot open config file:", str(e))
     except sqlite3.OperationalError as e:
-        print "Sql error:", e
+        error("Sql error:", e)
     except ImportError:
         pass
     finally:
