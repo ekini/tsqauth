@@ -48,7 +48,7 @@ def add(user,password):
         cur.execute("INSERT INTO users (`username`, `password`) VALUES (?, ?)", (user, password))
         con.commit()
     except sqlite3.IntegrityError as e:
-        error(e)
+        error(str(e))
 
 # удаляет пользователя
 def delete(user):
@@ -81,19 +81,25 @@ def main():
         group.add_argument("-d", "--delete", action='store_true', help="Delete user")
 
         args = parser.parse_args()
-       
-        user = args.user
-        password = args.password
+      
+        # python 2
+        try:
+            user = args.user.decode(encoding)
+            password = args.password.decode(encoding)
+        # python 3
+        except AttributeError:
+            user = args.user
+            password = args.password
 
         if args.add:
             if (user is not None) and (password is not None):
-                add(user.decode(encoding).lower(), password.decode(encoding))
+                add(user.lower(), password)
             else:
                 error("need username and password")
                 sys.exit(2)
         elif args.delete:
             if (user is not None):
-                delete(user.decode(encoding).lower())
+                delete(user.lower())
             else:
                 error("need username")
                 sys.exit(2)
