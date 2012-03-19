@@ -8,6 +8,7 @@ except ImportError:
 
 import sys # sys.exit
 import argparse
+from tsqauth import error, conffile
 
 try:
     import configparser # python3
@@ -16,15 +17,10 @@ except ImportError:
 
 import hashlib # md5 hash
 import base64
-conffile = "/etc/tsqauth/config.cfg"
+
 cur = None
 con = None
 encoding = None
-
-def error(*e):
-    l = list(e)
-    l.insert(0, "Error:")
-    print(" ".join(l))
 
 # выдает md5 хэш строки
 def passwd(p):
