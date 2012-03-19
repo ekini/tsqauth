@@ -11,41 +11,60 @@ try:
 except ImportError:
     import ConfigParser as configparser # python2
 
-conffile = "/etc/tsqauth/config.cfg"                                                     
+from tsqauth import error, conffile
+
 cur = None                                                                               
 con = None
-
-def error(*e):
-    l = list(e)
-    l.insert(0, "Error:")
-    print(" ".join(l))
 
 def main():
     global con, cur
     try:
         config = configparser.ConfigParser()
         config.readfp(open(conffile))
-        # коннектимся к бд, создаем таблицу, если её не существует
+
         con = sqlite3.connect(config.get("sql_auth", "users"))
         cur = con.cursor()
-        cur.execute("""
-        create table if not exists users
-        (
-            username    varchar(32) NOT NULL primary key collate nocase,
-            password    varchar(32) NOT NULL
-        )""")
-        con.commit()
+        try:
+            cur.execute("""
+            create table users
+            (
+                username    varchar(32) NOT NULL primary key collate nocase,
+                password    varchar(32) NOT NULL
+            )""")
+            con.commit()
+            print("Database \"users\" successfully created")
+        except sqlite3.OperationalError:
+            print("Database \"users\" is already created")
+
+        cur.close()
+        con.close()
+
+        con = sqlite3.connect(config.get("sql", "session_db"))
+        cur = con.cursor()
+        try:
+            cur.execute("""
+            create table addresses
+            (
+                ip    varchar(15) NOT NULL,
+                user  varchar(32) NOT NULL,
+                start_time    uint(11) NOT NULL,
+                end_time      uint(11) NOT NULL
+    )""")
+            con.commit()
+            print("Database \"session_db\" successfully created")
+        except sqlite3.OperationalError:
+            print("Database \"session_db\" is already created")
 
     except IOError as e:
         error("Cannot open config file:", str(e))
     except sqlite3.OperationalError as e:
-        error("Sql error:", e)
+        error("(Sql)", str(e))
     except ImportError:
         pass
     finally:
         # закрываем бд
         if cur is not None: cur.close()
-        if cur is not None: con.close()
+        if con is not None: con.close()
 
 if __name__=="__main__":
     main()
