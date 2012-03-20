@@ -14,7 +14,7 @@ try:
 except ImportError:
     import ConfigParser as configparser  # python2
 
-from tsqauth import error, crypt, ispy3  # functions
+from tsqauth import error, unicode_crypt, getsalt, ispy3  # functions
 from tsqauth import conffile, encoding  # variables
 
 cur = None
@@ -33,7 +33,8 @@ def list_users():
 # добавляет пользователя, если такого не существует
 def add(user, password):
     global con, cur
-    password = crypt(password)
+
+    password = unicode_crypt(password, "".join(["$6$", getsalt()]))
     try:
         cur.execute("""INSERT INTO users
             (`username`, `password`) VALUES (?, ?)""", (user, password))
