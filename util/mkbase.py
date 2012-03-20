@@ -6,15 +6,16 @@ try:
 except ImportError:
     from pysqlite2 import dbapi2 as sqlite3
 
-try:                                                                                     
-    import configparser # python3
+try:
+    import configparser  # python3
 except ImportError:
-    import ConfigParser as configparser # python2
+    import ConfigParser as configparser  # python2
 
 from tsqauth import error, conffile
 
-cur = None                                                                               
+cur = None
 con = None
+
 
 def main():
     global con, cur
@@ -63,8 +64,10 @@ def main():
         pass
     finally:
         # закрываем бд
-        if cur is not None: cur.close()
-        if con is not None: con.close()
+        if cur is not None:
+            cur.close()
+        if con is not None:
+            con.close()
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
