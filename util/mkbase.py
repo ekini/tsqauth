@@ -30,7 +30,7 @@ def main():
             create table users
             (
                 username    varchar(32) NOT NULL primary key collate nocase,
-                password    varchar(32) NOT NULL
+                password    varchar(100) NOT NULL
             )""")
             con.commit()
             print("Database \"users\" successfully created")
