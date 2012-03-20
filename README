@@ -31,6 +31,7 @@ iptables -t nat -I PREROUTING 1 -p tcp -s 192.168.0.0 ! -d 192.168.0.1 --dport
 3) web - а тут скрипты и конфиги для nginx+uwsgi.
 
 Ниже - версии софта с USE-флагами.
+Необходим python >= 2.7 или >=3.2 (для argparse)
 
 net-proxy/squid
 Installed versions:  3.1.8!t(02:07:19 PM 07/12/2011)(caps epoll ipv6
