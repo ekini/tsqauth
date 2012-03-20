@@ -1,20 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import sys  # sys.exit
+import argparse
+
 try:
     import sqlite3
 except ImportError:
     from pysqlite2 import dbapi2 as sqlite3
 
-import sys  # sys.exit
-import argparse
-from tsqauth import error, crypt, ispy3  # functions
-from tsqauth import conffile, encoding  # variables
-
 try:
     import configparser  # python3
 except ImportError:
     import ConfigParser as configparser  # python2
+
+from tsqauth import error, crypt, ispy3  # functions
+from tsqauth import conffile, encoding  # variables
 
 cur = None
 con = None
