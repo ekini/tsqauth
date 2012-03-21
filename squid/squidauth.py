@@ -2,9 +2,8 @@
 
 import os
 import time
-import sys # sys.exit(), sys.stdout.flush()
+import sys  # sys.exit(), sys.stdout.flush()
 import argparse
-from tsqauth import error, conffile
 
 try:
     import sqlite3
@@ -12,44 +11,42 @@ except ImportError:
     from pysqlite2 import dbapi2 as sqlite3
 
 try:
-    import configparser # python3
+    import configparser  # python3
 except ImportError:
-    import ConfigParser as configparser # python2
+    import ConfigParser as configparser  # python2
 
-error("blah")
+from tsqauth import error  # functions
+from tsqauth import conffile  # variables
+
 
 def main():
-    con = sqlite3.connect(DB_FILE)
+    config = configparser.ConfigParser()
+    config.readfp(open(conffile))
+
+    # connect to database with 10 sec timeout
+    con = sqlite3.connect(config.get("sql", "session_db"), 10)
     cur = con.cursor()
-    cur.execute("""
-            create table if not exists addresses
-            (
-              ip    varchar(15) NOT NULL,
-              user  varchar(32) NOT NULL,
-              start_time    uint(11) NOT NULL,
-              end_time      uint(11) NOT NULL
-            )
-            """)
 
     while (1):
         # remove trailing characters from string
         ip = sys.stdin.readline().strip()
 
         # delete old entries
-        failsafe_execute("delete from addresses where end_time<%s;" % time.time())
+        con.execute("delete from addresses where end_time<(?)",
+                    (int(time.time()), ))
         con.commit()
-        failsafe_execute("select * from addresses where ip=\'%s\';" % ip)
+        con.execute("select * from addresses where ip=(?)", (ip, ))
         result = cur.fetchone()
         if result:
             (ip, user, start_time, end_time) = result
-        # ok reply for squid with username
-            print "OK user=%s" % user 
+            # ok reply for squid with username
+            print("OK user=%s" % user)
             sys.stdout.flush()
         else:
-            print "ERR"
+            print("ERR")
             sys.stdout.flush()
     cur.close()
     con.close()
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
