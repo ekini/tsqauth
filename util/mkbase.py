@@ -51,6 +51,13 @@ def main():
                 start_time    uint(11) NOT NULL,
                 end_time      uint(11) NOT NULL
     )""")
+            cur.execute("""
+            create table log
+            (
+                ip    varchar(15) NOT NULL,
+                user  varchar(32) NOT NULL,
+                start_time    uint(11) NOT NULL
+            )""")
             con.commit()
             print("Database \"session_db\" successfully created")
         except sqlite3.OperationalError:
@@ -60,8 +67,6 @@ def main():
         error("Cannot open config file:", str(e))
     except sqlite3.OperationalError as e:
         error("(Sql)", str(e))
-    except ImportError:
-        pass
     finally:
         # закрываем бд
         if cur is not None:
