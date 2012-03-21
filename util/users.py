@@ -3,7 +3,7 @@
 
 import sys  # sys.exit
 import argparse
-
+from crypt import crypt
 try:
     import sqlite3
 except ImportError:
@@ -14,8 +14,8 @@ try:
 except ImportError:
     import ConfigParser as configparser  # python2
 
-from tsqauth import error, unicode_crypt, getsalt, ispy3  # functions
-from tsqauth import conffile, encoding  # variables
+from tsqauth import error, getsalt, ispy3  # functions
+from tsqauth import conffile  # variables
 
 cur = None
 con = None
@@ -34,7 +34,7 @@ def list_users():
 def add(user, password):
     global con, cur
 
-    password = unicode_crypt(password, "".join(["$6$", getsalt()]))
+    password = crypt(password, "".join(["$6$", getsalt()]))
     try:
         cur.execute("""INSERT INTO users
             (`username`, `password`) VALUES (?, ?)""", (user, password))
@@ -64,6 +64,7 @@ def main():
         # коннектимся к бд, создаем таблицу, если её не существует
         # timeout 10 sec
         con = sqlite3.connect(config.get("sql_auth", "users"), 10)
+        con.text_factory = str
         cur = con.cursor()
 
         parser = argparse.ArgumentParser()
@@ -79,24 +80,15 @@ def main():
 
         args = parser.parse_args()
 
-        if ispy3():  # Python 3
-            user = args.user
-            password = args.password
-        else:  # Python 2
-            if args.user is not None:
-                user = args.user.decode(encoding)
-            if (args.password is not None):
-                password = args.password.decode(encoding)
-
         if args.add:
-            if (user is not None) and (password is not None):
-                add(user.lower(), password)
+            if (args.user is not None) and (args.password is not None):
+                add(args.user.lower(), args.password)
             else:
                 error("need username and password")
                 sys.exit(2)
         elif args.delete:
-            if (user is not None):
-                delete(user.lower())
+            if (args.user is not None):
+                delete(args.user.lower())
             else:
                 error("need username")
                 sys.exit(2)
