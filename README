@@ -1,5 +1,7 @@
 Ekini soft (c) \m/ :D
 
+v0.1
+
 Тут находятся скрипты для прозрачной аутентификации пользователей на squid.
 Используются nginx+uwsgi+python+python-sqlite+python-ldap.
 
