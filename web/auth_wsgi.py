@@ -2,103 +2,108 @@
 # -*- coding: utf-8 -*-
 
 import cgi
-from urlparse import parse_qs
-import urllib
-import ldap 
-import os # for os.environ
-import pysqlite2
-from pysqlite2 import dbapi2 as sqlite3
-import time # for time.sleep and time conversion functions
-import datetime 
-import hashlib
-import base64
+try:
+    from urlparse import parse_qs  # Python 2
+    from urllib import quote
+except ImportError:
+    from urllib.parse import parse_qs, quote  # Python 3
 
-# Адрес ldap сервера в случае авторизации через ldap-server или путь к файлу БД с пользователями в случае sql.
-#path = "192.168.0.4"
-path = "/usr/libexec/squidldapauth/users.db"
-# метод аутентификации, может быть "ldap" или "sql"
-method="sql"
+try:
+    import ldap
+except ImportError:
+    pass
+import os  # for os.environ
+import sys
+from crypt import crypt
 
-template_head1=u"""
-<html><head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-"""
-template_head2=u"""
-<title>Авторизация</title>
-</head>
-<body>"""
-template_authform=u"""
-<form method=post>
-<table align="center" border="0">
-<tr><td>
-<input type="hidden" name="url" value="%s">
-Логин:</td><td><input type="text" name="username" value="%s"></td>
-</tr>
-<tr><td>
-Пароль:</td><td><input type="password" name="password" value="%s"></td>
-</tr>
-<tr><td>
-<input type=submit>
-</td></tr>
-</table>
-</form>
-"""
-template_tail=u"""</body>
-</html>
-"""
-template_signout=u"""
-<form method=post><input type="hidden" name="signout" value="true"><input type=submit value="Выйти"></form>
-"""
+try:
+    import configparser  # Python 3
+except ImportError:
+    import ConfigParser as configparser  # Python2
+try:
+    import sqlite3
+except ImportError:
+    from pysqlite2 import dbapi2 as sqlite3
 
-def passwd(p):
-    m = hashlib.md5()
-    m.update(p)
-    return base64.b64encode(m.digest())
+import time  # for time.sleep and time conversion functions
+import datetime
+
+from tsqauth import error, template, ispy3  # functions
+from tsqauth import conffile, encoding
+
+config = None
+
+try:
+    config = configparser.ConfigParser()
+    config.readfp(open(conffile))
+except IOError as e:
+    error(str(e))
+
 
 class Authentificator:
     def __init__(self):
-        if (method == "ldap"):
-            self.a = self.auth_ldap
-        if (method == "sql"):
-            self.a = self.auth_sql
-        else:
-            self.a = self.auth_ldap
-    # общая функция аутентификации, вызывает auth_ldap или auth_sql в зависимости от значения переменной "method"
+        pass
+
+    # общая функция аутентификации, вызывает auth_ldap или auth_sql
+    # в зависимости от значения переменной "method"
     def auth(self, username, password):
         # если логин или пароль пустой, то выводим ошибку
-        if (username == "" or password == ""): return "Enter login and password"
-        ret = self.a(username, password)
-        # если конкретная функция выдала строку, значит аутентификация не прошла, выводим то, что она выдала
-        if (ret != ""):
-            return "(%s) %s" % (method, ret)
-        # а если прошла, то выводим пустую строку
+        if not (username and password):
+            return "Enter login and password"
         else:
             return ""
+
+
+class AuthentificatorSql(Authentificator):
+    def __init__(self):
+        pass
+
     # аутентифицирует по бд sql
-    def auth_sql(self, username, password):
+    def auth(self, username, password):
+        ret = Authentificator.auth(self, username, password)
+        if ret != "":
+            return ret
+        cur = None
+        con = None
         try:
-            con = sqlite3.connect(path)
+            con = sqlite3.connect(config.get("sql_auth", "users"))
+            con.text_factory = str
             cur = con.cursor()
-            cur.execute("select * from users where username=\'%s\';" % username)
+            cur.execute("""select username, password
+                        from users where username=(?)""", (username, ))
             result = cur.fetchone()
-            # если пользователь найден, то сравниваем хэш переданного пароля с хэшем пароля, хранящимся в бд
+            # если пользователь найден, то сравниваем хэш
+            # переданного пароля с хэшем пароля, хранящимся в бд
             if result:
-                if (result[1] == passwd(password)):
+                if (result[1] == crypt(password, result[1][:5])):
                     return ""
                 else:
-                    return "Invalid password"
+                    return "(sql_auth) Invalid password"
             else:
-                return "User not found"
-            cur.close()
-            con.close()
-        except(pysqlite2.dbapi2.OperationalError) as e:
-            return e
+                return "(sql_auth) User not found"
+        except(sqlite3.OperationalError) as e:
+            error("(sql_auth)", str(e))
+            return str(e)
+        finally:
+            if cur is not None:
+                cur.close()
+            if con is not None:
+                con.close()
+        return ""
 
+
+class AuthentificatorLdap(Authentificator):
+    def __init__(self):
+        pass
+
+    def auth(self, username, password):
+        ret = Authentificator.auth(self, username, password)
+        if ret:
+            return ret
     # аутентифицирует пользователя через ldap-сервер
-    def auth_ldap(self, username, password):
         try:
-            l = ldap.open(path)
-            login_dn = "uid=%s,ou=internetusers,dc=vnipiomsk,dc=ru" % username
+            l = ldap.open(config.get("ldap", "server"))
+            login_dn = config.get("ldap", "login_dn") % username
             login_pass = password
             l.simple_bind_s(login_dn, login_pass)
         except(ldap.INVALID_CREDENTIALS):
@@ -110,43 +115,16 @@ class Authentificator:
 
         return ""
 
+
 class Baseinfo:
-    def __init__(self, filename = "/usr/libexec/squidldapauth/ip.db", tries = 5): # tries - количество попыток записать что-то в базу. Интервал между ними - 1 с.
-        self.tries = tries
-        self.con = sqlite3.connect(filename)
+    def __init__(self, filename, timeout=10):
+        self.con = sqlite3.connect(filename, timeout)
+        self.con.text_factory = str
         self.cur = self.con.cursor()
-        # создаем таблицы. В таблице addresses хранятся текущие сессии, а в log - соответсвенно, прошлые :)
-        self.cur.execute("""
-        create table if not exists addresses
-        (
-            ip    varchar(15) NOT NULL,
-            user  varchar(32) NOT NULL,
-            start_time    uint(11) NOT NULL,
-            end_time  uint(11) NOT NULL
-        )""")
-        self.cur.execute("""
-        create table if not exists log 
-        (
-            ip    varchar(15) NOT NULL,
-            user  varchar(32) NOT NULL,
-            start_time    uint(11) NOT NULL
-        )
-        """)
-        self.con.commit()
 
     def __del__(self):
         self.cur.close()
         self.con.close()
-
-    # сделано на случай, если несколько процессов захотят одновременно записать что-то в бд.
-    def failsafe_execute(self, query):
-        for x in range(0, self.tries):
-            try:
-                self.cur.execute(query)
-                break
-            except sqlite3.OperationalError:
-                time.sleep(1)
-                pass
 
     # записывает сессию в бд
     def write_auth_info(self, ip, username):
@@ -154,93 +132,106 @@ class Baseinfo:
         end_time_dt = None
         start_time = int(time.time())
         date_now = datetime.datetime.now()
-        # Берем текущее время. Если час меньше 19, то время конца сессии будет в 19:00 этого же дня.
+        # Берем текущее время. Если час меньше 19,
+        # то время конца сессии будет в 19:00 этого же дня.
         if date_now.hour < 19:
-            end_time_dt = date_now.replace(hour=19,minute=0,second=0)
+            end_time_dt = date_now.replace(hour=19, minute=0, second=0)
         else:
-            # иначе, прибавляем к нему 12 часов, т.е. время конца сесси будет в 7:00 следующего дня.
-            end_time_dt = date_now.replace(hour=19,minute=0,second=0)+datetime.timedelta(hours=12)
+            # иначе, прибавляем к нему 12 часов, т.е. время конца сессии
+            # будет в 7:00 следующего дня.
+            end_time_dt = date_now.replace(hour=19, minute=0, second=0) + datetime.timedelta(hours=12)
         end_time = time.mktime(end_time_dt.timetuple())
 
-        self.failsafe_execute("select * from addresses where ip=\'%s\';" % ip)
+        self.cur.execute("select * from addresses where ip=(?)", (ip, ))
         result = self.cur.fetchone()
         if result:
             # если пользователь логинится заново, то продляем сессию согласно логике выше
-            self.failsafe_execute("UPDATE addresses SET `end_time`=\"%s\",`user`=\"%s\" WHERE `ip`=\"%s\"" % (int(end_time), username, ip))
+            self.cur.execute("UPDATE addresses SET `end_time`=(?),`user`=(?) WHERE `ip`=(?)", (int(end_time), username, ip))
         else:
-            # а если нет, то записываем сессию 
-            self.failsafe_execute("INSERT INTO addresses (`ip`, `user`, `start_time`, `end_time` ) VALUES (\"%s\", \"%s\", \"%s\", \"%s\")" % (ip, username, start_time, int(end_time)))
-            self.failsafe_execute("INSERT INTO log (`ip`, `user`, `start_time` ) VALUES (\"%s\", \"%s\", \"%s\")" % (ip, username, start_time))
+            # а если нет, то записываем сессию
+            self.cur.execute("""INSERT INTO addresses (`ip`, `user`, `start_time`, `end_time` )
+            VALUES (?, ?, ?, ?)""", (ip, username, start_time, int(end_time)))
+            self.cur.execute("INSERT INTO log (`ip`, `user`, `start_time` ) VALUES (\"%s\", \"%s\", \"%s\")" % (ip, username, start_time))
         self.con.commit()
 
     # если пользователь залогинен, и вызывает данный скрипт, то выдаем ему табличку с информацией, а также с кнопочкой "Выйти"
     def get_logged(self, ip):
-        self.failsafe_execute("select * from addresses where ip=\'%s\';" % ip)
+        self.cur.execute("select * from addresses where ip=(?)", (ip, ))
         result = self.cur.fetchone()
-        if result:
-            s = u"<table><tr><td>Зашел с адреса</td><td>%s</td></tr><tr><td>под именем</td><td>%s</td></td><tr><td>Время захода</td><td>%s</td></tr><tr><td>Время выхода</td><td>%s</td></table>" % (result[0], result[1], time.asctime(time.localtime(result[2])), time.asctime(time.localtime(result[3])))
-            return s 
-        return u""
 
-    def del_auth(self,ip):
-        self.failsafe_execute("delete from addresses where ip=\'%s\';" % ip)
+        if result:
+            s = template("logged", {
+                "address": result[0],
+                "name": result[1],
+                "itime": time.asctime(time.localtime(result[2])),
+                "otime": time.asctime(time.localtime(result[3]))
+                })
+            return s
+        return ""
+
+    def del_auth(self, ip):
+        self.cur.execute("delete from addresses where ip=(?)", (ip, ))
         self.con.commit()
 
+
 def application(env, start_response):
-    start_response('200 OK', [('Content-Type','text/html')])
+    start_response('200 OK', [('Content-Type', 'text/html')])
 
     try:
         # парсим POST
-        d = parse_qs(env['wsgi.input'].read())
-    except (KeyError):
+        if ispy3():
+            post = env['wsgi.input'].read().decode(encoding)
+        else:
+            post = env['wsgi.input'].read()
+        d = parse_qs(post)
+    except KeyError:
         # а если он пустой, то GET
         d = parse_qs(env['QUERY_STRING'])
 
     ip = env["REMOTE_ADDR"]
     username = d.get('username', [''])[0]
     password = d.get('password', [''])[0]
-    url      = d.get('url', ['http://google.com'])[0]
-    signout  = d.get('signout', [''])[0]
+    url = d.get('url', ['http://google.com'])[0]
+    signout = d.get('signout', [''])[0]
 
-    # ескейпим данные, полученные от пользователя
-    username = cgi.escape(username)
-    password = cgi.escape(password)
-    url      = cgi.escape(url)
-    signout = cgi.escape(signout)
+    username = username.lower()
 
-    b = Baseinfo()
+    b = Baseinfo(config.get("sql", "session_db"))
     if (signout == "true"):
         b.del_auth(ip)
+
     logged = b.get_logged(ip)
-
-    resp = u""
-    resp += template_head1 
-
-    if (logged != ""):
-        resp += template_head2   
-        resp += logged
-        resp += template_signout
+    resp = list()
+    resp.append(template("head1"))
+    if (logged):
+        resp.append(template("head2"))
+        resp.append(logged)
+        resp.append(template("signout"))
     else:
-        a = Authentificator()
+        a = AuthentificatorSql()
         auth = a.auth(username, password)
         if (auth == ""):
-            resp += u"<META HTTP-EQUIV=\"refresh\" CONTENT=\"3;URL=%s\">" % url 
+            resp.append("<META HTTP-EQUIV=\"refresh\" CONTENT=\"3;URL=%s\">" % url)
+            resp.append(template("head2"))
             b.write_auth_info(ip, username)
-            resp += u"<h1>Перенаправляю на адрес...<br></h1> <p><a href=\"%s\">%s</a></p>"% (url, url)
+            resp.append("<h1>Перенаправляю на адрес...<br></h1> <p><a href=\"%s\">%s</a></p>" % (url, url))
         else:
-            resp += u"<h1 align=\"center\">Введите логин и пароль!</h1><p align=\"center\"><a href=\"%s\">%s</a></p>" % (url, url)
-            resp += template_authform % (url, username, password)
-            resp += u"<p align=\"center\">Error: %s</p>" % auth
-        resp += template_head2   
+            resp.append("<h1 align=\"center\">Введите логин и пароль!</h1><p align=\"center\"><a href=\"%s\">%s</a></p>" % (url, url))
+            resp.append(template("authform", {"url": url, "username": username, "password": password}))
+            resp.append("<p align=\"center\">Error: %s</p>" % auth)
 
-    resp += template_tail
+    resp.append(template("tail"))
+    ret = "\n".join(resp)
 
-    return resp.encode("utf-8")
+    if ispy3():  # Python 3
+        return ret.encode(encoding)
+    else:
+        return ret
+
 
 def my_response(st, txt):
-    print st, txt
+    print(st, txt)
 
-if __name__=="__main__":
-    u = urllib.quote("http://google.com")
-    print application({"QUERY_STRING" : "username=Dementiev&password=338857&url=%s" % u, "REMOTE_ADDR" : "192.168.0.108"}, my_response )
-
+if __name__ == "__main__":
+    u = quote("http://google.com")
+    print(application({"QUERY_STRING": "username=вася2&password=тест&url=%s" % u, "REMOTE_ADDR": "192.168.0.109"}, my_response))
