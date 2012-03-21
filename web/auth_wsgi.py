@@ -10,8 +10,9 @@ except ImportError:
 
 try:
     import ldap
+    ldap_available = True
 except ImportError:
-    pass
+    ldap_available = False
 import os  # for os.environ
 import sys
 from crypt import crypt
@@ -104,14 +105,15 @@ class AuthentificatorLdap(Authentificator):
         try:
             l = ldap.open(config.get("ldap", "server"))
             login_dn = config.get("ldap", "login_dn") % username
+            error(login_dn)
             login_pass = password
             l.simple_bind_s(login_dn, login_pass)
         except(ldap.INVALID_CREDENTIALS):
-            return "INVALID LOGIN/PASSWORD"
+            return "(ldap) INVALID LOGIN/PASSWORD"
         except(ldap.SERVER_DOWN):
-            return "Server is down"
+            return "(ldap) Server is down"
         except:
-            return "Unknown error"
+            return "(ldap) Unknown error"
 
         return ""
 
@@ -208,8 +210,15 @@ def application(env, start_response):
         resp.append(logged)
         resp.append(template("signout"))
     else:
-        a = AuthentificatorSql()
-        auth = a.auth(username, password)
+        if (config.get("global", "auth_method") == "ldap"):
+            if ldap_available:
+                a = AuthentificatorLdap()
+                auth = a.auth(username, password)
+            else:
+                auth = "Ldap module is not available"
+        else:
+            a = AuthentificatorSql()
+            auth = a.auth(username, password)
         if (auth == ""):
             resp.append("<META HTTP-EQUIV=\"refresh\" CONTENT=\"3;URL=%s\">" % url)
             resp.append(template("head2"))
@@ -234,4 +243,4 @@ def my_response(st, txt):
 
 if __name__ == "__main__":
     u = quote("http://google.com")
-    print(application({"QUERY_STRING": "username=вася2&password=тест&url=%s" % u, "REMOTE_ADDR": "192.168.0.109"}, my_response))
+    print(application({"QUERY_STRING": "username=вася2&password=тест&url=%s" % u, "REMOTE_ADDR": "192.168.0.107"}, my_response))
