@@ -25,6 +25,7 @@ def main():
 
     # connect to database with 10 sec timeout
     con = sqlite3.connect(config.get("sql", "session_db"), 10)
+    con.text_factory = str
     cur = con.cursor()
 
     while (1):
@@ -32,15 +33,14 @@ def main():
         ip = sys.stdin.readline().strip()
 
         # delete old entries
-        con.execute("delete from addresses where end_time<(?)",
+        cur.execute("delete from addresses where end_time<(?)",
                     (int(time.time()), ))
         con.commit()
-        con.execute("select * from addresses where ip=(?)", (ip, ))
+        cur.execute("select user from addresses where ip=(?)", (ip, ))
         result = cur.fetchone()
         if result:
-            (ip, user, start_time, end_time) = result
             # ok reply for squid with username
-            print("OK user=%s" % user)
+            print("OK user=%s" % result)
             sys.stdout.flush()
         else:
             print("ERR")
