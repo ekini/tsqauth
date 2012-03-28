@@ -177,65 +177,74 @@ class Baseinfo:
 
 
 def application(env, start_response):
-    start_response('200 OK', [('Content-Type', 'text/html')])
 
     try:
-        # парсим POST
-        if ispy3():
-            post = env['wsgi.input'].read().decode(encoding)
-        else:
-            post = env['wsgi.input'].read()
-        d = parse_qs(post)
-    except KeyError:
-        # а если он пустой, то GET
-        d = parse_qs(env['QUERY_STRING'])
-
-    ip = env["REMOTE_ADDR"]
-    username = d.get('username', [''])[0]
-    password = d.get('password', [''])[0]
-    url = d.get('url', ['http://google.com'])[0]
-    signout = d.get('signout', [''])[0]
-
-    username = username.lower()
-
-    b = Baseinfo(config.get("sql", "session_db"))
-    if (signout == "true"):
-        b.del_auth(ip)
-
-    logged = b.get_logged(ip)
-    resp = list()
-    resp.append(template("head1"))
-    if (logged):
-        resp.append(template("head2"))
-        resp.append(logged)
-        resp.append(template("signout"))
-    else:
-        if (config.get("global", "auth_method") == "ldap"):
-            if ldap_available:
-                a = AuthentificatorLdap()
-                auth = a.auth(username, password)
+        try:
+            # парсим POST
+            if ispy3():
+                post = env['wsgi.input'].read().decode(encoding)
             else:
-                auth = "Ldap module is not available"
-        else:
-            a = AuthentificatorSql()
-            auth = a.auth(username, password)
-        if (auth == ""):
-            resp.append("<META HTTP-EQUIV=\"refresh\" CONTENT=\"3;URL=%s\">" % url)
+                post = env['wsgi.input'].read()
+            d = parse_qs(post)
+        except KeyError:
+            # а если он пустой, то GET
+            d = parse_qs(env['QUERY_STRING'])
+
+        ip = env["REMOTE_ADDR"]
+        username = d.get('username', [''])[0]
+        password = d.get('password', [''])[0]
+        url = d.get('url', ['http://google.com'])[0]
+        signout = d.get('signout', [''])[0]
+
+        username = username.lower()
+
+        b = Baseinfo(config.get("sql", "session_db"))
+        if (signout == "true"):
+            b.del_auth(ip)
+
+        logged = b.get_logged(ip)
+        resp = list()
+        resp.append(template("head1"))
+        if (logged):
             resp.append(template("head2"))
-            b.write_auth_info(ip, username)
-            resp.append("<h1>Перенаправляю на адрес...<br></h1> <p><a href=\"%s\">%s</a></p>" % (url, url))
+            resp.append(logged)
+            resp.append(template("signout"))
         else:
-            resp.append("<h1 align=\"center\">Введите логин и пароль!</h1><p align=\"center\"><a href=\"%s\">%s</a></p>" % (url, url))
-            resp.append(template("authform", {"url": url, "username": username, "password": password}))
-            resp.append("<p align=\"center\">Error: %s</p>" % auth)
+            if (config.get("global", "auth_method") == "ldap"):
+                if ldap_available:
+                    a = AuthentificatorLdap()
+                    auth = a.auth(username, password)
+                else:
+                    auth = "Ldap module is not available"
+            else:
+                a = AuthentificatorSql()
+                auth = a.auth(username, password)
+            if (auth == ""):
+                resp.append("<META HTTP-EQUIV=\"refresh\" CONTENT=\"3;URL=%s\">" % url)
+                resp.append(template("head2"))
+                b.write_auth_info(ip, username)
+                resp.append("<h1>Перенаправляю на адрес...<br></h1> <p><a href=\"%s\">%s</a></p>" % (url, url))
+            else:
+                resp.append("<h1 align=\"center\">Введите логин и пароль!</h1><p align=\"center\"><a href=\"%s\">%s</a></p>" % (url, url))
+                resp.append(template("authform", {"url": url, "username": username, "password": password}))
+                resp.append("<p align=\"center\">Error: %s</p>" % auth)
 
-    resp.append(template("tail"))
-    ret = "\n".join(resp)
+        resp.append(template("tail"))
+        ret = "\n".join(resp)
 
-    if ispy3():  # Python 3
-        return ret.encode(encoding)
-    else:
-        return ret
+        start_response('200 OK', [('Content-Type', 'text/html')])
+
+        if ispy3():  # Python 3
+            return ret.encode(encoding)
+        else:
+            return ret
+    except:
+        start_response('403 ERROR', [('Content-Type', 'text/plain')])
+
+        if ispy3():
+            return "Unknown error".encode(encoding)
+        else:
+            return "Unknown error"
 
 
 def my_response(st, txt):
