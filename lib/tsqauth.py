@@ -16,6 +16,13 @@ except ImportError:
 conffile = "/etc/tsqauth/config.cfg"
 encoding = None
 
+def error(*e):
+    l = list(e)
+    l.insert(0, "Error:")
+    l.append("\n")
+    sys.stderr.write(" ".join(l))
+
+
 try:
     config = configparser.ConfigParser()
     config.readfp(open(conffile))
@@ -24,12 +31,6 @@ except IOError as e:
     error(str(e))
 except configparser.NoOptionError:
     encoding = "utf-8"
-
-def error(*e):
-    l = list(e)
-    l.insert(0, "Error:")
-    l.append("\n")
-    sys.stderr.write(" ".join(l))
 
 
 def ispy3():
