@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# Copyright: 2012, Eugene "ekini" Dementiev
+# Author: Eugene "ekini" Dementiev (http://dementiev.eu)
+# License: Beerware
 
 try:
     import sqlite3
